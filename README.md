@@ -19,16 +19,21 @@ No account, no sign-in — recipes are stored locally on your device.
 
 1. Go to the repo's **Actions** tab → **Build Android APK** workflow.
 2. Open the latest successful run.
-3. Under **Artifacts**, download `rotaysh-debug-apk` (a zip containing the `.apk`).
-4. Unzip it, transfer `app-debug.apk` to your Android phone (or open the
+3. Under **Artifacts**, download `rotaysh-release-apk` (a zip containing the `.apk`).
+4. Unzip it, transfer `app-release.apk` to your Android phone (or open the
    download link directly on your phone's browser), and tap it to install.
    Android will ask permission to install from that source the first time —
    allow it.
 
-Every build is signed with the same fixed debug key (`android-keystore/debug.keystore`,
-committed in this repo), so installing a newer `.apk` over an older one
-**updates the app in place and keeps your saved recipes** — no need to
-uninstall first.
+This is a **release** build, meaning the JavaScript is bundled directly
+into the `.apk` — it runs fully offline with no dev server needed (unlike
+a debug build, which expects to fetch JS live from Metro on your computer).
+
+Every build is signed with the same fixed key (`android-keystore/debug.keystore`,
+committed in this repo — a debug-style key used here purely so every build
+has a consistent signature, not for the Play Store), so installing a newer
+`.apk` over an older one **updates the app in place and keeps your saved
+recipes** — no need to uninstall first.
 
 ## Run it locally (optional, for development)
 
