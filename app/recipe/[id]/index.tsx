@@ -1,4 +1,3 @@
-import { useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -9,29 +8,16 @@ import {
   ActivityIndicator,
   Image,
 } from "react-native";
-import { useLocalSearchParams, useRouter, useFocusEffect, Stack } from "expo-router";
+import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { supabase } from "@/lib/supabase";
-import { Recipe } from "@/lib/types";
+import { useRecipes } from "@/contexts/RecipesContext";
 import { theme } from "@/lib/theme";
 
 export default function RecipeDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const [recipe, setRecipe] = useState<Recipe | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    const { data, error } = await supabase.from("recipes").select("*").eq("id", id).single();
-    if (!error) setRecipe(data as Recipe);
-    setLoading(false);
-  }, [id]);
-
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load])
-  );
+  const { getRecipe, deleteRecipe, isLoading } = useRecipes();
+  const recipe = getRecipe(id);
 
   const handleDelete = () => {
     Alert.alert("Delete recipe?", "This can't be undone.", [
@@ -40,18 +26,14 @@ export default function RecipeDetail() {
         text: "Delete",
         style: "destructive",
         onPress: async () => {
-          const { error } = await supabase.from("recipes").delete().eq("id", id);
-          if (error) {
-            Alert.alert("Couldn't delete", error.message);
-            return;
-          }
+          await deleteRecipe(id);
           router.back();
         },
       },
     ]);
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <View style={styles.centered}>
         <ActivityIndicator size="large" color={theme.colors.primary} />

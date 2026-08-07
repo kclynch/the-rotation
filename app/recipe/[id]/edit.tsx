@@ -1,38 +1,22 @@
-import { useCallback, useState } from "react";
-import { View, ActivityIndicator } from "react-native";
-import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
+import { View, Text, ActivityIndicator } from "react-native";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { RecipeForm } from "@/components/RecipeForm";
-import { supabase } from "@/lib/supabase";
-import { Recipe, RecipeInput } from "@/lib/types";
+import { useRecipes } from "@/contexts/RecipesContext";
+import { RecipeInput } from "@/lib/types";
 import { theme } from "@/lib/theme";
 
 export default function EditRecipe() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  const [recipe, setRecipe] = useState<Recipe | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useFocusEffect(
-    useCallback(() => {
-      supabase
-        .from("recipes")
-        .select("*")
-        .eq("id", id)
-        .single()
-        .then(({ data }) => {
-          setRecipe((data as Recipe) ?? null);
-          setLoading(false);
-        });
-    }, [id])
-  );
+  const { getRecipe, updateRecipe, isLoading } = useRecipes();
+  const recipe = getRecipe(id);
 
   const handleSubmit = async (value: RecipeInput) => {
-    const { error } = await supabase.from("recipes").update(value).eq("id", id);
-    if (error) throw error;
+    await updateRecipe(id, value);
     router.back();
   };
 
-  if (loading || !recipe) {
+  if (isLoading) {
     return (
       <View
         style={{
@@ -47,11 +31,20 @@ export default function EditRecipe() {
     );
   }
 
-  return (
-    <RecipeForm
-      initialValue={recipe}
-      submitLabel="Save Changes"
-      onSubmit={handleSubmit}
-    />
-  );
+  if (!recipe) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: theme.colors.background,
+        }}
+      >
+        <Text style={{ color: theme.colors.muted }}>Recipe not found.</Text>
+      </View>
+    );
+  }
+
+  return <RecipeForm initialValue={recipe} submitLabel="Save Changes" onSubmit={handleSubmit} />;
 }
