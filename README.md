@@ -2,8 +2,9 @@
 
 *(pronounced "roh-TAYSH" — an abbreviation of "Rotation")*
 
-A simple recipe book for your phone. Browse, add, edit, and delete recipes.
-No account, no sign-in — recipes are stored locally on your device.
+A simple recipe book for your phone. Browse, add, edit, and delete recipes,
+pick what you're making this week, and get a shopping list. No account,
+no sign-in — everything is stored locally on your device.
 
 ## How it works
 
@@ -55,24 +56,31 @@ trigger it manually: repo → **Actions** → **Build Android APK** → **Run wo
 
 ```
 app/
-  index.tsx              recipe book (list + search)
+  (tabs)/
+    index.tsx             recipe book (list + search)
+    plan.tsx               this week's recipes + shopping list
+  select-week.tsx          pick which recipes are on the menu this week
   recipe/
-    new.tsx               add a recipe
-    [id]/index.tsx          recipe detail
-    [id]/edit.tsx             edit a recipe
-lib/                     shared types, theme
-contexts/RecipesContext.tsx  local recipe state, backed by AsyncStorage
-components/                RecipeCard, RecipeForm
-android-keystore/            stable debug signing key used by CI
-.github/workflows/            the Android build pipeline
+    new.tsx                 add a recipe
+    [id]/index.tsx            recipe detail
+    [id]/edit.tsx               edit a recipe
+lib/                      shared types, theme, shopping list aggregation
+contexts/
+  RecipesContext.tsx        local recipe state, backed by AsyncStorage
+  MealPlanContext.tsx        weekly selection + shopping list check-off state
+components/                 RecipeCard, RecipeForm
+android-keystore/             stable debug signing key used by CI
+.github/workflows/             the Android build pipeline
 ```
 
 ## Notes
 
 - Recipe images are entered as a URL for now (paste a link to a photo).
-- This is a debug build, meant for installing directly on your own phone
-  (sideloading) — not intended for the Play Store. If you ever want that,
-  it would need a proper release keystore and Play Store submission, which
-  is a separate step from what's set up here.
-- The placeholder icon/splash images in `assets/` are solid brand-color
-  squares — swap them for real artwork any time.
+- The shopping list combines ingredients by exact text match (case-insensitive),
+  showing a `×2` count when the same line appears in more than one recipe.
+  It doesn't parse quantities/units, so "1 cup flour" and "2 cups flour"
+  show up as two separate lines rather than being added together.
+- This build is meant for installing directly on your own phone (sideloading)
+  — not intended for the Play Store. If you ever want that, it would need a
+  proper release keystore and Play Store submission, which is a separate
+  step from what's set up here.
