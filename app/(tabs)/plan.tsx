@@ -1,12 +1,89 @@
-import { useMemo } from "react";
-import { View, Text, ScrollView, Pressable, StyleSheet, Alert, ActivityIndicator } from "react-native";
+import { useMemo, useState } from "react";
+import {
+  View,
+  Text,
+  ScrollView,
+  TextInput,
+  Pressable,
+  StyleSheet,
+  Alert,
+  ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRecipes } from "@/contexts/RecipesContext";
-import { useMealPlan } from "@/contexts/MealPlanContext";
-import { buildShoppingList } from "@/lib/shoppingList";
+import { useMealPlan, ShoppingListItem } from "@/contexts/MealPlanContext";
 import { theme } from "@/lib/theme";
+
+function ShoppingListRow({
+  item,
+  onToggle,
+  onSave,
+  onDelete,
+}: {
+  item: ShoppingListItem;
+  onToggle: () => void;
+  onSave: (text: string) => void;
+  onDelete: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(item.text);
+
+  const startEditing = () => {
+    setDraft(item.text);
+    setEditing(true);
+  };
+
+  const save = () => {
+    onSave(draft);
+    setEditing(false);
+  };
+
+  if (editing) {
+    return (
+      <View style={styles.itemRow}>
+        <TextInput
+          style={styles.editInput}
+          value={draft}
+          onChangeText={setDraft}
+          autoFocus
+          onSubmitEditing={save}
+          returnKeyType="done"
+        />
+        <Pressable onPress={save} hitSlop={8}>
+          <Ionicons name="checkmark-circle" size={22} color={theme.colors.primary} />
+        </Pressable>
+        <Pressable onPress={() => setEditing(false)} hitSlop={8}>
+          <Ionicons name="close-circle" size={22} color={theme.colors.muted} />
+        </Pressable>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.itemRow}>
+      <Pressable onPress={onToggle} hitSlop={8}>
+        <Ionicons
+          name={item.checked ? "checkbox" : "square-outline"}
+          size={22}
+          color={item.checked ? theme.colors.primary : theme.colors.muted}
+        />
+      </Pressable>
+      <Pressable style={styles.itemTextWrap} onPress={onToggle}>
+        <Text style={[styles.itemText, item.checked && styles.itemTextChecked]}>{item.text}</Text>
+      </Pressable>
+      <Pressable onPress={startEditing} hitSlop={8}>
+        <Ionicons name="pencil" size={18} color={theme.colors.muted} />
+      </Pressable>
+      <Pressable onPress={onDelete} hitSlop={8}>
+        <Ionicons name="trash" size={18} color={theme.colors.danger} />
+      </Pressable>
+    </View>
+  );
+}
 
 export default function WeeklyPlan() {
   const router = useRouter();
@@ -17,27 +94,40 @@ export default function WeeklyPlan() {
     isLoading: planLoading,
     toggleRecipe,
     clearWeek,
-    checkedItems,
+    items,
+    addItem,
+    updateItem,
+    deleteItem,
     toggleItem,
-    clearCheckedItems,
+    clearList,
+    resetChecks,
   } = useMealPlan();
+  const [newItemText, setNewItemText] = useState("");
 
   const selectedRecipes = useMemo(
     () => selectedIds.map((id) => recipes.find((r) => r.id === id)).filter(Boolean) as typeof recipes,
     [recipes, selectedIds]
   );
 
-  const shoppingList = useMemo(
-    () => buildShoppingList(recipes, selectedIds),
-    [recipes, selectedIds]
-  );
+  const checkedCount = items.filter((item) => item.checked).length;
 
-  const checkedCount = shoppingList.filter((item) => checkedItems[item.key]).length;
+  const handleAddItem = () => {
+    if (!newItemText.trim()) return;
+    addItem(newItemText);
+    setNewItemText("");
+  };
 
   const handleClearWeek = () => {
-    Alert.alert("Clear this week?", "This removes your selected recipes and shopping list.", [
+    Alert.alert("Clear this week's recipes?", "Your shopping list won't be affected.", [
       { text: "Cancel", style: "cancel" },
       { text: "Clear", style: "destructive", onPress: clearWeek },
+    ]);
+  };
+
+  const handleClearList = () => {
+    Alert.alert("Clear the whole list?", "This deletes every item, checked or not.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Clear List", style: "destructive", onPress: clearList },
     ]);
   };
 
@@ -50,80 +140,102 @@ export default function WeeklyPlan() {
   }
 
   return (
-    <ScrollView
+    <KeyboardAvoidingView
       style={styles.container}
-      contentContainerStyle={[styles.content, { paddingBottom: 48 + insets.bottom }]}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Selected for this week</Text>
-        <Pressable style={styles.pickButton} onPress={() => router.push("/select-week")}>
-          <Ionicons name="add" size={16} color={theme.colors.primaryDark} />
-          <Text style={styles.pickButtonText}>Choose recipes</Text>
-        </Pressable>
-      </View>
-
-      {selectedRecipes.length === 0 ? (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>No recipes picked yet</Text>
-          <Text style={styles.emptySubtitle}>
-            Choose the recipes you're making this week to build a shopping list.
-          </Text>
-        </View>
-      ) : (
-        <>
-          <View style={styles.card}>
-            {selectedRecipes.map((recipe) => (
-              <View key={recipe.id} style={styles.recipeRow}>
-                <Text style={styles.recipeRowText} numberOfLines={1}>
-                  {recipe.title}
-                </Text>
-                <Pressable onPress={() => toggleRecipe(recipe.id)} hitSlop={8}>
-                  <Ionicons name="close-circle" size={20} color={theme.colors.muted} />
-                </Pressable>
-              </View>
-            ))}
-          </View>
-
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>
-              Shopping list{shoppingList.length > 0 ? ` (${checkedCount}/${shoppingList.length})` : ""}
-            </Text>
-            {checkedCount > 0 ? (
-              <Pressable onPress={clearCheckedItems}>
-                <Text style={styles.linkText}>Reset checks</Text>
-              </Pressable>
-            ) : null}
-          </View>
-
-          <View style={styles.card}>
-            {shoppingList.map((item) => {
-              const checked = !!checkedItems[item.key];
-              return (
-                <Pressable
-                  key={item.key}
-                  style={styles.itemRow}
-                  onPress={() => toggleItem(item.key)}
-                >
-                  <Ionicons
-                    name={checked ? "checkbox" : "square-outline"}
-                    size={22}
-                    color={checked ? theme.colors.primary : theme.colors.muted}
-                  />
-                  <Text style={[styles.itemText, checked && styles.itemTextChecked]}>
-                    {item.text}
-                    {item.count > 1 ? ` ×${item.count}` : ""}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-
-          <Pressable style={styles.clearWeekButton} onPress={handleClearWeek}>
-            <Text style={styles.clearWeekButtonText}>Clear this week</Text>
+      <ScrollView
+        contentContainerStyle={[styles.content, { paddingBottom: 48 + insets.bottom }]}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>Selected for this week</Text>
+          <Pressable style={styles.pickButton} onPress={() => router.push("/select-week")}>
+            <Ionicons name="add" size={16} color={theme.colors.primaryDark} />
+            <Text style={styles.pickButtonText}>Choose recipes</Text>
           </Pressable>
-        </>
-      )}
-    </ScrollView>
+        </View>
+
+        {selectedRecipes.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>No recipes picked yet</Text>
+            <Text style={styles.emptySubtitle}>
+              Choose recipes to add their ingredients to your shopping list.
+            </Text>
+          </View>
+        ) : (
+          <>
+            <View style={styles.card}>
+              {selectedRecipes.map((recipe) => (
+                <View key={recipe.id} style={styles.recipeRow}>
+                  <Text style={styles.recipeRowText} numberOfLines={1}>
+                    {recipe.title}
+                  </Text>
+                  <Pressable onPress={() => toggleRecipe(recipe.id)} hitSlop={8}>
+                    <Ionicons name="close-circle" size={20} color={theme.colors.muted} />
+                  </Pressable>
+                </View>
+              ))}
+            </View>
+            <Pressable style={styles.clearWeekButton} onPress={handleClearWeek}>
+              <Text style={styles.clearWeekButtonText}>Clear this week's recipes</Text>
+            </Pressable>
+          </>
+        )}
+
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionTitle}>
+            Shopping list{items.length > 0 ? ` (${checkedCount}/${items.length})` : ""}
+          </Text>
+          {checkedCount > 0 ? (
+            <Pressable onPress={resetChecks}>
+              <Text style={styles.linkText}>Reset checks</Text>
+            </Pressable>
+          ) : null}
+        </View>
+
+        <View style={styles.addItemRow}>
+          <TextInput
+            style={styles.addItemInput}
+            placeholder="Add something to the list"
+            placeholderTextColor={theme.colors.muted}
+            value={newItemText}
+            onChangeText={setNewItemText}
+            onSubmitEditing={handleAddItem}
+            returnKeyType="done"
+          />
+          <Pressable style={styles.addItemButton} onPress={handleAddItem}>
+            <Ionicons name="add" size={22} color="#fff" />
+          </Pressable>
+        </View>
+
+        {items.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text style={styles.emptyTitle}>Your list is empty</Text>
+            <Text style={styles.emptySubtitle}>
+              Choose recipes above or add an item yourself.
+            </Text>
+          </View>
+        ) : (
+          <>
+            <View style={styles.card}>
+              {items.map((item) => (
+                <ShoppingListRow
+                  key={item.id}
+                  item={item}
+                  onToggle={() => toggleItem(item.id)}
+                  onSave={(text) => updateItem(item.id, text)}
+                  onDelete={() => deleteItem(item.id)}
+                />
+              ))}
+            </View>
+            <Pressable style={styles.clearWeekButton} onPress={handleClearList}>
+              <Text style={styles.clearWeekButtonText}>Clear list</Text>
+            </Pressable>
+          </>
+        )}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -194,7 +306,7 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius,
     borderWidth: 1,
     borderColor: theme.colors.border,
-    marginBottom: 20,
+    marginBottom: 12,
     overflow: "hidden",
   },
   recipeRow: {
@@ -213,6 +325,30 @@ const styles = StyleSheet.create({
     color: theme.colors.text,
     marginRight: 12,
   },
+  addItemRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+  },
+  addItemInput: {
+    flex: 1,
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.radius,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    color: theme.colors.text,
+  },
+  addItemButton: {
+    width: 46,
+    height: 46,
+    borderRadius: theme.radius,
+    backgroundColor: theme.colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   itemRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -222,8 +358,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: theme.colors.border,
   },
-  itemText: {
+  itemTextWrap: {
     flex: 1,
+  },
+  itemText: {
     fontSize: 15,
     color: theme.colors.text,
   },
@@ -231,9 +369,18 @@ const styles = StyleSheet.create({
     color: theme.colors.muted,
     textDecorationLine: "line-through",
   },
+  editInput: {
+    flex: 1,
+    fontSize: 15,
+    color: theme.colors.text,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.primary,
+    paddingVertical: 2,
+  },
   clearWeekButton: {
     alignItems: "center",
     paddingVertical: 12,
+    marginBottom: 8,
   },
   clearWeekButtonText: {
     fontSize: 14,
