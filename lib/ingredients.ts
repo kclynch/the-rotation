@@ -147,8 +147,38 @@ function parseLeadingNumber(input: string): { value: number; rest: string } | nu
   return null;
 }
 
+// A handful of common food words whose crude "strip trailing s" singular
+// would collide with a genuinely different, unrelated word - skip those.
+const SINGULARIZE_EXCEPTIONS = new Set([
+  "hummus",
+  "asparagus",
+  "citrus",
+  "molasses",
+  "swiss",
+  "grass",
+]);
+
+// Deliberately simple English singularization so "chicken breast" and
+// "chicken breasts" key the same way. This only affects the internal
+// grouping key, never the displayed text, so an imperfect stem (e.g.
+// "asparagus" losing its final "s") is harmless as long as it's applied
+// consistently - it still only merges two lines that are actually the
+// same food.
+function singularize(word: string): string {
+  if (SINGULARIZE_EXCEPTIONS.has(word)) return word;
+  if (word.endsWith("ies") && word.length > 4) return word.slice(0, -3) + "y";
+  if (word.endsWith("oes") && word.length > 4) return word.slice(0, -2);
+  if (/(sh|ch|x|z)es$/.test(word)) return word.slice(0, -2);
+  if (word.endsWith("s") && !word.endsWith("ss") && word.length > 2) return word.slice(0, -1);
+  return word;
+}
+
 function normalizeKey(s: string): string {
-  return s.toLowerCase().trim().replace(/\s+/g, " ");
+  const collapsed = s.toLowerCase().trim().replace(/\s+/g, " ");
+  const words = collapsed.split(" ");
+  const lastIndex = words.length - 1;
+  if (lastIndex >= 0) words[lastIndex] = singularize(words[lastIndex]);
+  return words.join(" ");
 }
 
 export function parseIngredient(text: string): ParsedIngredient {
@@ -195,6 +225,27 @@ function pluralizeUnit(unit: string, quantity: number): string {
   return PLURALIZABLE_UNITS[unit] ?? unit;
 }
 
+function pluralizeWord(word: string): string {
+  if (word.endsWith("y") && word.length > 1 && !/[aeiou]y$/i.test(word)) {
+    return word.slice(0, -1) + "ies";
+  }
+  if (/(s|sh|ch|x|z)$/i.test(word)) return word + "es";
+  return word + "s";
+}
+
+// Only pluralizes when there's no unit word (units like "2 cups flour"
+// don't need "flour" itself to pluralize - it's a mass noun; countable
+// items like "chicken breast(s)" or "onion(s)" do).
+function pluralizeItemDisplay(display: string, quantity: number): string {
+  if (quantity === 1) return display;
+  const words = display.split(" ");
+  const lastIndex = words.length - 1;
+  const last = words[lastIndex];
+  if (!last || singularize(last.toLowerCase()) !== last.toLowerCase()) return display; // already plural-looking
+  words[lastIndex] = pluralizeWord(last);
+  return words.join(" ");
+}
+
 export function formatIngredientText(
   quantity: number,
   unit: string | null,
@@ -202,7 +253,7 @@ export function formatIngredientText(
 ): string {
   const qtyStr = formatQuantity(quantity);
   if (unit) return `${qtyStr} ${pluralizeUnit(unit, quantity)} ${itemDisplay}`;
-  return `${qtyStr} ${itemDisplay}`;
+  return `${qtyStr} ${pluralizeItemDisplay(itemDisplay, quantity)}`;
 }
 
 /**
