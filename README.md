@@ -1,4 +1,4 @@
-# Rotaysh 🍲
+# The Rotaysh 🍲
 
 *(pronounced "roh-TAYSH" — an abbreviation of "Rotation")*
 
