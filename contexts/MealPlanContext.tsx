@@ -8,7 +8,7 @@ import {
   useCallback,
 } from "react";
 import { useRecipes } from "@/contexts/RecipesContext";
-import { mergeIngredientIntoItems } from "@/lib/ingredients";
+import { mergeIngredientIntoItems, consolidateItems } from "@/lib/ingredients";
 
 const SELECTED_KEY = "rotaysh:mealplan:selected";
 const ITEMS_KEY = "rotaysh:mealplan:items";
@@ -49,7 +49,17 @@ export function MealPlanProvider({ children }: PropsWithChildren) {
     Promise.all([AsyncStorage.getItem(SELECTED_KEY), AsyncStorage.getItem(ITEMS_KEY)])
       .then(([selectedRaw, itemsRaw]) => {
         if (selectedRaw) setSelectedIds(JSON.parse(selectedRaw));
-        if (itemsRaw) setItems(JSON.parse(itemsRaw));
+        if (itemsRaw) {
+          const loaded: ShoppingListItem[] = JSON.parse(itemsRaw);
+          const consolidated = consolidateItems(loaded);
+          setItems(consolidated);
+          // Lines saved before this parsing/merge logic existed (or before
+          // a parsing fix) won't have been combined yet - fix that now so
+          // it doesn't wait for the next add/edit.
+          if (consolidated.length !== loaded.length) {
+            AsyncStorage.setItem(ITEMS_KEY, JSON.stringify(consolidated)).catch(() => {});
+          }
+        }
       })
       .catch((err) => console.warn("Failed to load meal plan", err))
       .finally(() => setIsLoading(false));
