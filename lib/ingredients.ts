@@ -1,16 +1,18 @@
 // Lightweight ingredient-line parsing so the shopping list can combine
-// matching ingredients across recipes (e.g. "2 chicken breasts" +
-// "3 chicken breasts" -> "5 chicken breasts") without needing a network
-// call or a heavy NLP dependency.
+// matching ingredients across recipes (e.g. "2 boneless, skinless chicken
+// breasts" + "3 chicken breasts" -> "5 chicken breasts") without needing a
+// network call or a heavy NLP dependency.
 //
 // This is a heuristic, not a real parser: it recognizes a leading number
-// (including simple/mixed fractions and common unicode fraction glyphs)
-// and an optional unit word from a fixed dictionary. Two lines only merge
-// when both the item name (after stripping the quantity/unit and any
-// trailing ", note" clause) and the unit match exactly. Different
-// phrasing ("chicken breast" vs "chicken breasts"), synonyms, or
-// mismatched units are intentionally left unmerged rather than risking
-// wrong math.
+// (including simple/mixed fractions and common unicode fraction glyphs),
+// an optional unit word from a fixed dictionary, and strips a fixed list
+// of descriptive/prep words (boneless, fresh, diced, room temperature,
+// etc.) and singular/plural differences from the item name before
+// comparing. Two lines merge when what's left - the "core" food item -
+// and the unit match; the unit must still match exactly ("2 cups flour"
+// and "1 lb flour" stay separate, since combining them needs a unit
+// conversion, not just addition), and unrecognized synonyms ("scallion"
+// vs "green onion") still won't merge.
 
 const UNICODE_FRACTIONS: Record<string, number> = {
   "¼": 0.25,
@@ -92,8 +94,12 @@ const PLURALIZABLE_UNITS: Record<string, string> = {
 export type ParsedIngredient = {
   quantity: number | null;
   unit: string | null;
+  /** Fully reduced form (descriptors stripped, singularized, lowercased) - matching only, never shown. */
   itemKey: string;
+  /** Original phrasing (minus a trailing prep note) - shown for a standalone, unmerged item. */
   itemDisplay: string;
+  /** Descriptors stripped but casing kept - used to build the text for a *merged* item. */
+  itemCore: string;
 };
 
 // Words that only ever appear as a *trailing* prep instruction after a
@@ -110,6 +116,99 @@ function stripTrailingNote(text: string): string {
   const head = text.slice(0, commaIndex).trim();
   const tail = text.slice(commaIndex + 1).trim();
   return TRAILING_NOTE_PATTERN.test(tail) ? head : text;
+}
+
+// Descriptive/prep words that don't change *what* you need to buy, only
+// how it's prepped or which variety - stripped wherever they appear (not
+// just trailing) so "2 boneless, skinless chicken breasts" and "3 chicken
+// breasts" are recognized as the same thing to purchase. Longer phrases
+// are listed so they match as a unit ("room temperature", not "room" +
+// "temperature" separately).
+const DESCRIPTOR_WORDS = [
+  "extra virgin",
+  "extra large",
+  "bone-in",
+  "bone in",
+  "skin-on",
+  "skin on",
+  "boneless",
+  "skinless",
+  "fresh",
+  "frozen",
+  "dried",
+  "ground",
+  "ripe",
+  "large",
+  "small",
+  "medium",
+  "jumbo",
+  "virgin",
+  "unsalted",
+  "salted",
+  "organic",
+  "whole",
+  "lean",
+  "low-fat",
+  "low fat",
+  "nonfat",
+  "fat-free",
+  "room temperature",
+  "at room temperature",
+  "cold",
+  "warm",
+  "hot",
+  "raw",
+  "cooked",
+  "uncooked",
+  "lightly",
+  "firmly packed",
+  "loosely packed",
+  "packed",
+  "plus more",
+  "to taste",
+  "for garnish",
+  "for serving",
+  "optional",
+  "divided",
+  "finely chopped",
+  "coarsely chopped",
+  "roughly chopped",
+  "thinly sliced",
+  "finely diced",
+  "diced",
+  "chopped",
+  "minced",
+  "sliced",
+  "grated",
+  "melted",
+  "softened",
+  "chilled",
+  "cubed",
+  "shredded",
+  "halved",
+  "quartered",
+  "crushed",
+  "beaten",
+  "peeled",
+  "deveined",
+  "rinsed",
+  "drained",
+  "trimmed",
+  "seeded",
+  "cored",
+  "julienned",
+].sort((a, b) => b.length - a.length); // longest first so phrases match before their sub-words
+
+const DESCRIPTOR_PATTERN = new RegExp(
+  `\\b(${DESCRIPTOR_WORDS.map((w) => w.replace(/[-\s]/g, "[- ]")).join("|")})\\b`,
+  "gi"
+);
+
+/** Strips descriptive/prep words, keeping the food name itself. Preserves original casing. */
+function coreItemText(text: string): string {
+  const withoutCommas = text.replace(/,/g, " ");
+  const stripped = withoutCommas.replace(DESCRIPTOR_PATTERN, " ");
+  return stripped.replace(/\s+/g, " ").trim();
 }
 
 function parseLeadingNumber(input: string): { value: number; rest: string } | null {
@@ -174,11 +273,20 @@ function singularize(word: string): string {
 }
 
 function normalizeKey(s: string): string {
-  const collapsed = s.toLowerCase().trim().replace(/\s+/g, " ");
-  const words = collapsed.split(" ");
+  const core = coreItemText(s).toLowerCase();
+  const words = core.split(" ").filter(Boolean);
   const lastIndex = words.length - 1;
   if (lastIndex >= 0) words[lastIndex] = singularize(words[lastIndex]);
   return words.join(" ");
+}
+
+function buildParsed(
+  quantity: number | null,
+  unit: string | null,
+  itemDisplay: string
+): ParsedIngredient {
+  const itemCore = coreItemText(itemDisplay) || itemDisplay;
+  return { quantity, unit, itemKey: normalizeKey(itemDisplay), itemDisplay, itemCore };
 }
 
 export function parseIngredient(text: string): ParsedIngredient {
@@ -186,7 +294,7 @@ export function parseIngredient(text: string): ParsedIngredient {
   const numResult = parseLeadingNumber(trimmed);
 
   if (!numResult) {
-    return { quantity: null, unit: null, itemKey: normalizeKey(trimmed), itemDisplay: trimmed };
+    return buildParsed(null, null, trimmed);
   }
 
   const { value } = numResult;
@@ -195,7 +303,7 @@ export function parseIngredient(text: string): ParsedIngredient {
   // A range like "2-3 apples" can't be safely summed - bail out to
   // unparseable so it falls back to exact-text matching only.
   if (/^-\s*\d/.test(rest)) {
-    return { quantity: null, unit: null, itemKey: normalizeKey(trimmed), itemDisplay: trimmed };
+    return buildParsed(null, null, trimmed);
   }
 
   let unit: string | null = null;
@@ -212,7 +320,7 @@ export function parseIngredient(text: string): ParsedIngredient {
   rest = rest.trim().replace(/^of\s+/i, "");
   const itemDisplay = stripTrailingNote(rest.trim()) || rest.trim();
 
-  return { quantity: value, unit, itemKey: normalizeKey(itemDisplay), itemDisplay };
+  return buildParsed(value, unit, itemDisplay);
 }
 
 function formatQuantity(value: number): string {
@@ -286,7 +394,7 @@ export function mergeIngredientIntoItems<T extends { id: string; text: string }>
       const existing = items[matchIndex];
       const existingParsed = parseIngredient(existing.text);
       const combinedQty = (existingParsed.quantity ?? 0) + parsed.quantity;
-      const combinedText = formatIngredientText(combinedQty, parsed.unit, parsed.itemDisplay);
+      const combinedText = formatIngredientText(combinedQty, parsed.unit, parsed.itemCore);
       const next = [...items];
       next[matchIndex] = { ...existing, text: combinedText };
       return next;
@@ -339,7 +447,7 @@ export function consolidateItems<T extends { id: string; text: string; checked: 
         const existingParsed = parseIngredient(existing.text);
         if (existingParsed.quantity != null) {
           const combinedQty = existingParsed.quantity + parsed.quantity;
-          const combinedText = formatIngredientText(combinedQty, parsed.unit, parsed.itemDisplay);
+          const combinedText = formatIngredientText(combinedQty, parsed.unit, parsed.itemCore);
           result[matchIndex] = {
             ...existing,
             text: combinedText,

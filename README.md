@@ -88,13 +88,15 @@ android-keystore/             stable debug signing key used by CI
   you review the pre-filled form and tap Add Recipe. Sites that don't
   publish this structured data (rare, but it happens) won't import - just
   enter the recipe manually in that case.
-- **Shopping list grouping**: ingredients are combined when they have a
-  matching quantity/unit/item after parsing (e.g. "2 chicken breasts" +
-  "3 chicken breasts" → "5 chicken breasts"). This uses simple pattern
-  matching, not real language understanding, so it won't catch different
-  phrasing ("chicken breast" vs "chicken breasts"), synonyms, or mismatched
-  units ("2 cups flour" vs "1 lb flour" stay separate, since combining them
-  would require unit conversion, not just arithmetic). Anything that
+- **Shopping list grouping**: ingredients are combined by their "core"
+  item after stripping quantity, unit, and a fixed list of descriptive/prep
+  words (boneless, fresh, chopped, room temperature, etc.) and
+  singular/plural differences, so "2 boneless, skinless chicken breasts"
+  and "3 chicken breasts" become "5 chicken breasts". The unit still has
+  to match exactly - "2 cups flour" and "1 lb flour" stay separate, since
+  combining them would need a unit conversion, not just addition. It's
+  pattern matching, not real language understanding, so unrecognized
+  synonyms ("scallion" vs "green onion") won't merge. Anything that
   doesn't cleanly merge still gets deduplicated by exact text match, and
   the whole list is editable regardless - fix up merges/misses by hand
   with the pencil/trash icons.
