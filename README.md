@@ -61,13 +61,16 @@ app/
     plan.tsx               this week's recipes + shopping list
   select-week.tsx          pick which recipes are on the menu this week
   recipe/
-    new.tsx                 add a recipe
+    new.tsx                 add a recipe (manually, or import from a URL)
     [id]/index.tsx            recipe detail
     [id]/edit.tsx               edit a recipe
-lib/                      shared types, theme, shopping list aggregation
+lib/
+  types.ts, theme.ts         shared types, theme
+  ingredients.ts               ingredient quantity parsing + merging
+  recipeImport.ts               scrape a recipe URL's schema.org data
 contexts/
   RecipesContext.tsx        local recipe state, backed by AsyncStorage
-  MealPlanContext.tsx        weekly selection + shopping list check-off state
+  MealPlanContext.tsx        weekly selection + shopping list state
 components/                 RecipeCard, RecipeForm
 android-keystore/             stable debug signing key used by CI
 .github/workflows/             the Android build pipeline
@@ -75,11 +78,26 @@ android-keystore/             stable debug signing key used by CI
 
 ## Notes
 
-- Recipe images are entered as a URL for now (paste a link to a photo).
-- The shopping list combines ingredients by exact text match (case-insensitive),
-  showing a `×2` count when the same line appears in more than one recipe.
-  It doesn't parse quantities/units, so "1 cup flour" and "2 cups flour"
-  show up as two separate lines rather than being added together.
+- Recipe images are entered as a URL for now (paste a link to a photo),
+  unless imported from a recipe URL (see below), which fills it in
+  automatically when the source page provides one.
+- **Importing from a URL** (New Recipe screen → "Import from a link")
+  fetches the page and reads its embedded schema.org `Recipe` data - the
+  structured data most recipe sites already publish for Google search
+  results. No AI or third-party service involved, and nothing saves until
+  you review the pre-filled form and tap Add Recipe. Sites that don't
+  publish this structured data (rare, but it happens) won't import - just
+  enter the recipe manually in that case.
+- **Shopping list grouping**: ingredients are combined when they have a
+  matching quantity/unit/item after parsing (e.g. "2 chicken breasts" +
+  "3 chicken breasts" → "5 chicken breasts"). This uses simple pattern
+  matching, not real language understanding, so it won't catch different
+  phrasing ("chicken breast" vs "chicken breasts"), synonyms, or mismatched
+  units ("2 cups flour" vs "1 lb flour" stay separate, since combining them
+  would require unit conversion, not just arithmetic). Anything that
+  doesn't cleanly merge still gets deduplicated by exact text match, and
+  the whole list is editable regardless - fix up merges/misses by hand
+  with the pencil/trash icons.
 - This build is meant for installing directly on your own phone (sideloading)
   — not intended for the Play Store. If you ever want that, it would need a
   proper release keystore and Play Store submission, which is a separate

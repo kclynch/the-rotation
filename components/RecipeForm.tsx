@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { RecipeInput } from "@/lib/types";
 import { theme } from "@/lib/theme";
 
@@ -64,6 +65,7 @@ function ListEditor({
 }
 
 export function RecipeForm({ initialValue, submitLabel, onSubmit }: Props) {
+  const insets = useSafeAreaInsets();
   const [title, setTitle] = useState(initialValue?.title ?? "");
   const [description, setDescription] = useState(initialValue?.description ?? "");
   const [ingredients, setIngredients] = useState<string[]>(initialValue?.ingredients ?? [""]);
@@ -114,7 +116,10 @@ export function RecipeForm({ initialValue, submitLabel, onSubmit }: Props) {
   };
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={[styles.content, { paddingBottom: 48 + insets.bottom }]}
+    >
       <View style={styles.field}>
         <Text style={styles.label}>Title</Text>
         <TextInput

@@ -2,12 +2,14 @@ import { useState } from "react";
 import { View, Text, FlatList, TextInput, Pressable, StyleSheet, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRecipes } from "@/contexts/RecipesContext";
 import { useMealPlan } from "@/contexts/MealPlanContext";
 import { theme } from "@/lib/theme";
 
 export default function SelectWeek() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { recipes, isLoading } = useRecipes();
   const { selectedIds, toggleRecipe } = useMealPlan();
   const [query, setQuery] = useState("");
@@ -66,7 +68,10 @@ export default function SelectWeek() {
         />
       )}
 
-      <Pressable style={styles.doneButton} onPress={() => router.back()}>
+      <Pressable
+        style={[styles.doneButton, { marginBottom: 16 + insets.bottom }]}
+        onPress={() => router.back()}
+      >
         <Text style={styles.doneButtonText}>
           Done{selectedIds.length > 0 ? ` (${selectedIds.length} selected)` : ""}
         </Text>
@@ -144,7 +149,6 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     alignItems: "center",
     marginHorizontal: 16,
-    marginBottom: 16,
   },
   doneButtonText: {
     color: "#fff",

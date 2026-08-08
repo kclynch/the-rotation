@@ -8,6 +8,7 @@ import {
   useCallback,
 } from "react";
 import { useRecipes } from "@/contexts/RecipesContext";
+import { mergeIngredientIntoItems } from "@/lib/ingredients";
 
 const SELECTED_KEY = "rotaysh:mealplan:selected";
 const ITEMS_KEY = "rotaysh:mealplan:items";
@@ -74,18 +75,16 @@ export function MealPlanProvider({ children }: PropsWithChildren) {
       if (!isSelected) {
         const recipe = recipes.find((r) => r.id === id);
         if (!recipe) return;
-        const existingTexts = new Set(items.map((item) => item.text.trim().toLowerCase()));
-        const newItems: ShoppingListItem[] = [];
+        let nextItems = items;
         for (const ingredient of recipe.ingredients) {
-          const text = ingredient.trim();
-          if (!text) continue;
-          const key = text.toLowerCase();
-          if (existingTexts.has(key)) continue;
-          existingTexts.add(key);
-          newItems.push({ id: generateId(), text, checked: false });
+          nextItems = mergeIngredientIntoItems(nextItems, ingredient, (text) => ({
+            id: generateId(),
+            text,
+            checked: false,
+          }));
         }
-        if (newItems.length > 0) {
-          persistItems([...items, ...newItems]);
+        if (nextItems !== items) {
+          persistItems(nextItems);
         }
       }
     },
@@ -98,9 +97,12 @@ export function MealPlanProvider({ children }: PropsWithChildren) {
 
   const addItem = useCallback(
     (text: string) => {
-      const trimmed = text.trim();
-      if (!trimmed) return;
-      persistItems([...items, { id: generateId(), text: trimmed, checked: false }]);
+      const next = mergeIngredientIntoItems(items, text, (t) => ({
+        id: generateId(),
+        text: t,
+        checked: false,
+      }));
+      if (next !== items) persistItems(next);
     },
     [items, persistItems]
   );

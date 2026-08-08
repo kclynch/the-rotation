@@ -10,12 +10,14 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter, Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRecipes } from "@/contexts/RecipesContext";
 import { theme } from "@/lib/theme";
 
 export default function RecipeDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { getRecipe, deleteRecipe, isLoading } = useRecipes();
   const recipe = getRecipe(id);
 
@@ -68,7 +70,10 @@ export default function RecipeDetail() {
           ),
         }}
       />
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[styles.content, { paddingBottom: 48 + insets.bottom }]}
+      >
         {recipe.image_url ? (
           <Image source={{ uri: recipe.image_url }} style={styles.heroImage} />
         ) : null}
