@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { View, Text, FlatList, TextInput, Pressable, StyleSheet, ActivityIndicator } from "react-native";
 import { useRouter } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRecipes } from "@/contexts/RecipesContext";
 import { RecipeCard } from "@/components/RecipeCard";
@@ -9,6 +10,7 @@ import { theme } from "@/lib/theme";
 export default function RecipeBook() {
   const { recipes, isLoading } = useRecipes();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [query, setQuery] = useState("");
 
   const filtered = recipes.filter((recipe) => {
@@ -53,14 +55,17 @@ export default function RecipeBook() {
         <FlatList
           data={filtered}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: 100 + insets.bottom }]}
           renderItem={({ item }) => (
             <RecipeCard recipe={item} onPress={() => router.push(`/recipe/${item.id}`)} />
           )}
         />
       )}
 
-      <Pressable style={styles.fab} onPress={() => router.push("/recipe/new")}>
+      <Pressable
+        style={[styles.fab, { bottom: 24 + insets.bottom }]}
+        onPress={() => router.push("/recipe/new")}
+      >
         <Ionicons name="add" size={28} color="#fff" />
       </Pressable>
     </View>
@@ -115,7 +120,6 @@ const styles = StyleSheet.create({
   fab: {
     position: "absolute",
     right: 20,
-    bottom: 24,
     width: 56,
     height: 56,
     borderRadius: 28,
