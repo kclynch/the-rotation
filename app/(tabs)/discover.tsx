@@ -74,6 +74,7 @@ export default function Discover() {
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.filterScroll}
         contentContainerStyle={styles.filterRow}
       >
         <Pressable
@@ -216,10 +217,15 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: theme.colors.text,
   },
+  filterScroll: {
+    flexGrow: 0,
+    height: 44,
+    marginBottom: 6,
+  },
   filterRow: {
     paddingHorizontal: 16,
     gap: 8,
-    paddingBottom: 4,
+    alignItems: "center",
   },
   chip: {
     backgroundColor: theme.colors.card,
