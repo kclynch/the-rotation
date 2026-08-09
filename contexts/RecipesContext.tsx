@@ -10,6 +10,7 @@ import {
 import { Recipe, RecipeInput } from "@/lib/types";
 
 const STORAGE_KEY = "rotaysh:recipes";
+const ADDED_CATALOG_KEY = "rotaysh:addedCatalogIds";
 
 function generateId() {
   return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -22,18 +23,23 @@ type RecipesContextValue = {
   addRecipe: (input: RecipeInput) => Promise<Recipe>;
   updateRecipe: (id: string, input: RecipeInput) => Promise<void>;
   deleteRecipe: (id: string) => Promise<void>;
+  addedCatalogIds: string[];
+  isCatalogRecipeAdded: (catalogId: string) => boolean;
+  addFromCatalog: (catalogId: string, input: RecipeInput) => Promise<Recipe>;
 };
 
 const RecipesContext = createContext<RecipesContextValue | undefined>(undefined);
 
 export function RecipesProvider({ children }: PropsWithChildren) {
   const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [addedCatalogIds, setAddedCatalogIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    AsyncStorage.getItem(STORAGE_KEY)
-      .then((raw) => {
+    Promise.all([AsyncStorage.getItem(STORAGE_KEY), AsyncStorage.getItem(ADDED_CATALOG_KEY)])
+      .then(([raw, addedRaw]) => {
         if (raw) setRecipes(JSON.parse(raw));
+        if (addedRaw) setAddedCatalogIds(JSON.parse(addedRaw));
       })
       .catch((err) => console.warn("Failed to load recipes", err))
       .finally(() => setIsLoading(false));
@@ -77,9 +83,37 @@ export function RecipesProvider({ children }: PropsWithChildren) {
     [recipes, persist]
   );
 
+  const isCatalogRecipeAdded = useCallback(
+    (catalogId: string) => addedCatalogIds.includes(catalogId),
+    [addedCatalogIds]
+  );
+
+  const addFromCatalog = useCallback(
+    async (catalogId: string, input: RecipeInput) => {
+      const recipe = await addRecipe(input);
+      const nextAdded = addedCatalogIds.includes(catalogId)
+        ? addedCatalogIds
+        : [...addedCatalogIds, catalogId];
+      setAddedCatalogIds(nextAdded);
+      await AsyncStorage.setItem(ADDED_CATALOG_KEY, JSON.stringify(nextAdded));
+      return recipe;
+    },
+    [addRecipe, addedCatalogIds]
+  );
+
   return (
     <RecipesContext.Provider
-      value={{ recipes, isLoading, getRecipe, addRecipe, updateRecipe, deleteRecipe }}
+      value={{
+        recipes,
+        isLoading,
+        getRecipe,
+        addRecipe,
+        updateRecipe,
+        deleteRecipe,
+        addedCatalogIds,
+        isCatalogRecipeAdded,
+        addFromCatalog,
+      }}
     >
       {children}
     </RecipesContext.Provider>

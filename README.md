@@ -59,7 +59,9 @@ app/
   (tabs)/
     index.tsx             recipe book (list + search)
     plan.tsx               this week's recipes + shopping list
+    discover.tsx             browse/search/filter the built-in recipe catalog
   select-week.tsx          pick which recipes are on the menu this week
+  discover/[id].tsx         preview a catalog recipe + add it to your book
   recipe/
     new.tsx                 add a recipe (manually, or import from a URL)
     [id]/index.tsx            recipe detail
@@ -68,6 +70,7 @@ lib/
   types.ts, theme.ts         shared types, theme
   ingredients.ts               ingredient quantity parsing + merging
   recipeImport.ts               scrape a recipe URL's schema.org data
+  discoverCatalog.ts            100 built-in easy weeknight-dinner recipes
 contexts/
   RecipesContext.tsx        local recipe state, backed by AsyncStorage
   MealPlanContext.tsx        weekly selection + shopping list state
@@ -78,6 +81,13 @@ android-keystore/             stable debug signing key used by CI
 
 ## Notes
 
+- **Discover tab**: 100 original, easy weeknight-dinner recipes bundled
+  directly in the app (`lib/discoverCatalog.ts`) - written from scratch
+  rather than scraped from real sites, both to keep Discover fully
+  offline and to avoid copying anyone else's recipe text. Search by
+  title/ingredient/tag, filter by protein/method/cuisine or a "≤ 30 min"
+  toggle, sort by name or total time, and tap "Add to My Book" on any
+  recipe to copy it into your own editable book.
 - Recipe images are entered as a URL for now (paste a link to a photo),
   unless imported from a recipe URL (see below), which fills it in
   automatically when the source page provides one.

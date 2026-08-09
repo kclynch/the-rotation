@@ -29,6 +29,7 @@ export default function RootLayout() {
               name="select-week"
               options={{ title: "Choose Recipes", presentation: "modal" }}
             />
+            <Stack.Screen name="discover/[id]" options={{ title: "Recipe" }} />
           </Stack>
         </MealPlanProvider>
       </RecipesProvider>
